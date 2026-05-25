@@ -1,8 +1,8 @@
 {
   "type": "code",
-  "id": "caveinarmor",
-  "name": "Armor Cave-In Protection",
-  "author": ["Furio"],
+  "modid": "caveinarmor",
+  "name": "Rock Attac - Armor Protec",
+  "authors": ["Furio"],
   "contributors": [ "AlteOgre" ],
   "version": "1.0.0",
   "description": "Enables vanilla armor to natively mitigate crushing damage from falling blocks.",

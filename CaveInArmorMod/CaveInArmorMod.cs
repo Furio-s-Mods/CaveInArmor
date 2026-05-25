@@ -12,14 +12,11 @@ namespace CaveInArmorMod
     public class CaveInConfig
     {
         public bool Enabled { get; set; }
-        public string Mode { get; set; } // "Lottery" or "Layered"
-        
-        // Custom hit weights to override vanilla when using Lottery mode
-        public double HeadHitChance { get; set; }
-        public double TorsoHitChance { get; set; }
-        public double LegsHitChance { get; set; }
-
-        public float ArmorEffectivenessMultiplier { get; set; }
+        public bool EnableDebugLogging { get; set; }
+        public bool UseLayered { get; set; }
+        public float LayeredHeadMultiplier { get; set; }
+        public float LayeredTorsoMultiplier { get; set; }
+        public float LayeredLegsMultiplier { get; set; }
         public float DurabilityDamageMultiplier { get; set; }
         public float MinimumDamageThreshold { get; set; }
 
@@ -28,13 +25,13 @@ namespace CaveInArmorMod
             return new CaveInConfig
             {
                 Enabled = true,
-                Mode = "Lottery",
-                HeadHitChance = 0.20,
-                TorsoHitChance = 0.50,
-                LegsHitChance = 0.30,
-                ArmorEffectivenessMultiplier = 1.0f,
-                DurabilityDamageMultiplier = 1.0f,
-                MinimumDamageThreshold = 0.0f
+                EnableDebugLogging = false,
+                UseLayered = false,
+                LayeredHeadMultiplier = 1.0f,
+                LayeredTorsoMultiplier = 0.5f,
+                LayeredLegsMultiplier = 0.1f,
+                DurabilityDamageMultiplier = 0.1f,
+                MinimumDamageThreshold = 0.5f
             };
         }
     }
@@ -44,8 +41,6 @@ namespace CaveInArmorMod
         private Harmony harmony;
         public const string ModName = "caveinarmor";
         public const string HarmonyId = $"com.furio.{ModName}";
-        
-        // Target class you discovered inside VSSurvivalMod.dll
         public const string TargetClassName = "Vintagestory.GameContent.ModSystemWearableStats";
         public const string TargetMethodName = "handleDamaged";
 
@@ -68,12 +63,12 @@ namespace CaveInArmorMod
                 {
                     Config = CaveInConfig.CreateDefaultConfig();
                     api.StoreModConfig(Config, $"{ModName}Config.json");
-                    ModLogger.Notification($"[{ModName}] Created fresh default configuration file.");
+                    ModLogger.Notification($"[{ModName}] Generated fresh fallback configuration file.");
                 }
             }
             catch (Exception ex)
             {
-                ModLogger.Error($"[{ModName}] Config error. Resetting to internal defaults: {ex.Message}");
+                ModLogger.Error($"[{ModName}] Failed parsing config file. Using default parameters: {ex.Message}");
                 Config = CaveInConfig.CreateDefaultConfig();
             }
 
@@ -83,24 +78,22 @@ namespace CaveInArmorMod
 
             try
             {
-                // Pull target class directly from VSSurvivalMod assembly
                 Type targetType = typeof(ModSystemWearableStats);
                 MethodInfo originalMethod = AccessTools.Method(targetType, TargetMethodName);
 
                 if (originalMethod == null)
                 {
-                    ModLogger.Error($"[{ModName}] Could not find target method '{TargetMethodName}' to patch!");
+                    ModLogger.Error($"[{ModName}] Critical targeting failure. Target method '{TargetMethodName}' not found!");
                     return;
                 }
 
                 MethodInfo prefixMethod = AccessTools.Method(typeof(WearableStatsPatch), nameof(WearableStatsPatch.Prefix));
                 harmony.Patch(originalMethod, prefix: new HarmonyMethod(prefixMethod));
-                
                 ModLogger.Notification($"[{ModName}] Successfully patched cave-in defense calculations.");
             }
             catch (Exception ex)
             {
-                ModLogger.Error($"[{ModName}] Failed to apply harmony patch: {ex.Message}");
+                ModLogger.Error($"[{ModName}] Failed applying Harmony initialization sequence: {ex.Message}");
             }
         }
 
@@ -113,52 +106,84 @@ namespace CaveInArmorMod
 
     public static class WearableStatsPatch
     {
-        // Using a Harmony Prefix allows us to intercept and rewrite execution BEFORE the gatekeeper check runs
-        public static bool Prefix(IPlayer player, ref float damage, DamageSource dmgSource, object __instance)
+        public static bool Prefix(IPlayer player, ref float damage, DamageSource dmgSource, ref float __result)
         {
-            if (dmgSource == null || CaveInArmorModSystem.Config == null || damage <= 0f) return true;
-
-            // Only process our target environmental type
+            if (player?.InventoryManager == null || dmgSource == null || CaveInArmorModSystem.Config == null || damage <= 0f) return true;
             if (dmgSource.Type != EnumDamageType.Crushing) return true;
 
             IInventory inv = player.InventoryManager.GetOwnInventory(GlobalConstants.characterInvClassName);
             if (inv == null) return true;
 
-            ModSystemWearableStats systemInstance = __instance as ModSystemWearableStats;
-            if (systemInstance == null) return true;
-
             float initialDamage = damage;
 
-            // --- SELECTION TYPE LOGIC FROM CONFIG ---
-            if (CaveInArmorModSystem.Config.Mode.Equals("Layered", StringComparison.OrdinalIgnoreCase))
+            if (CaveInArmorModSystem.Config.EnableDebugLogging)
             {
-                // SYSTEM A: Layered calculations (Manually computing slots sequentially)
-                damage = CalculateSlotReduction(player, inv[(int)EnumCharacterDressType.ArmorHead], damage, dmgSource, initialDamage);
-                damage = CalculateSlotReduction(player, inv[(int)EnumCharacterDressType.ArmorBody], damage, dmgSource, initialDamage);
-                damage = CalculateSlotReduction(player, inv[(int)EnumCharacterDressType.ArmorLegs], damage, dmgSource, initialDamage);
+                CaveInArmorModSystem.ModLogger.Notification($"[{CaveInArmorModSystem.ModName}] Processing cave-in hit for {player.PlayerName}. Initial Damage: {initialDamage}. System Mode: {(CaveInArmorModSystem.Config.UseLayered ? "Layered" : "Lottery")}");
+            }
+
+            if (CaveInArmorModSystem.Config.UseLayered)
+            {
+                damage = CalculateSlotReduction(player, inv[(int)EnumCharacterDressType.ArmorHead], damage, dmgSource, initialDamage, CaveInArmorModSystem.Config.LayeredHeadMultiplier, "ArmorHead");
+                damage = CalculateSlotReduction(player, inv[(int)EnumCharacterDressType.ArmorBody], damage, dmgSource, initialDamage, CaveInArmorModSystem.Config.LayeredTorsoMultiplier, "ArmorBody");
+                damage = CalculateSlotReduction(player, inv[(int)EnumCharacterDressType.ArmorLegs], damage, dmgSource, initialDamage, CaveInArmorModSystem.Config.LayeredLegsMultiplier, "ArmorLegs");
                 
                 damage = Math.Max(CaveInArmorModSystem.Config.MinimumDamageThreshold, damage);
-                return false; // Skip vanilla execution entirely since we handled it all manually
+                
+                if (CaveInArmorModSystem.Config.EnableDebugLogging)
+                {
+                    CaveInArmorModSystem.ModLogger.Notification($"[{CaveInArmorModSystem.ModName}] Layered final modified damage for {player.PlayerName}: {damage}");
+                }
+                __result = damage; 
+                return false; 
             }
             else
             {
-                // SYSTEM B: Lottery system (Trick the vanilla code into processing it)
-                // Temporarily alter the damage source type to sneak right past the vanilla whitelist check
-                dmgSource.Type = EnumDamageType.BluntAttack;
+                double rnd = CaveInArmorModSystem.ServerApi.World.Rand.NextDouble();
+                ItemSlot targetSlot;
+                string slotName;
 
-                // Let the native method run natively using our modified damage source type!
-                // NOTE: If weights are customized in config, we could manually choose the slot here.
-                // Otherwise, vanilla naturally draws its own 20/50/30 lottery.
+                if ((rnd -= 0.2) < 0.0)
+                {
+                    targetSlot = inv[(int)EnumCharacterDressType.ArmorHead];
+                    slotName = "ArmorHead";
+                }
+                else if (rnd - 0.5 < 0.0)
+                {
+                    targetSlot = inv[(int)EnumCharacterDressType.ArmorBody];
+                    slotName = "ArmorBody";
+                }
+                else
+                {
+                    targetSlot = inv[(int)EnumCharacterDressType.ArmorLegs];
+                    slotName = "ArmorLegs";
+                }
+
+                damage = CalculateSlotReduction(player, targetSlot, damage, dmgSource, initialDamage, 1.0f, slotName);
+                damage = Math.Max(CaveInArmorModSystem.Config.MinimumDamageThreshold, damage);
                 
-                // After vanilla completes its calculations, the framework wraps back out.
-                // We handle post-calculations using direct injection behavior if needed, or allow standard return.
-                return true; 
+                if (CaveInArmorModSystem.Config.EnableDebugLogging)
+                {
+                    CaveInArmorModSystem.ModLogger.Notification($"[{CaveInArmorModSystem.ModName}] Lottery final modified damage for {player.PlayerName} (Targeted Slot: {slotName}): {damage}");
+                }
+                __result = damage; 
+                return false; 
             }
         }
 
-        private static float CalculateSlotReduction(IPlayer player, ItemSlot armorSlot, float currentDamage, DamageSource dmgSource, float initialDamage)
+        private static float CalculateSlotReduction(IPlayer player, ItemSlot armorSlot, float currentDamage, DamageSource dmgSource, float initialDamage, float slotMultiplier, string slotDebugName)
         {
-            if (currentDamage <= 0f || armorSlot == null || armorSlot.Empty) return currentDamage;
+            if (currentDamage <= 0f || armorSlot == null || slotMultiplier <= 0f) return currentDamage;
+            
+            if (armorSlot.Empty)
+            {
+                if (CaveInArmorModSystem.Config.EnableDebugLogging)
+                {
+                    CaveInArmorModSystem.ModLogger.Notification($"[{CaveInArmorModSystem.ModName}] Slot [{slotDebugName}] is empty. Skipping mitigation.");
+                }
+                return currentDamage;
+            }
+            
+            if (armorSlot.Itemstack?.Collectible == null) return currentDamage;
 
             var wearableStats = armorSlot.Itemstack.Collectible.GetCollectibleInterface<IWearableStatsSupplier>();
             if (wearableStats == null || !wearableStats.IsArmorType(armorSlot)) return currentDamage;
@@ -167,15 +192,22 @@ namespace CaveInArmorMod
             ProtectionModifiers protMods = wearableStats.GetProtectionModifiers(armorSlot);
             if (protMods == null) return currentDamage;
 
-            int weaponTier = dmgSource.DamageTier;
-            float flatDmgProt = protMods.FlatDamageReduction;
-            float percentProt = protMods.RelativeProtection;
+            int weaponTier = Math.Max(0, dmgSource.DamageTier);
+            float flatDmgProt = protMods.FlatDamageReduction * slotMultiplier;
+            float percentProt = protMods.RelativeProtection * slotMultiplier;
+
+            float[] flatLossArray = protMods.PerTierFlatDamageReductionLoss ?? [0f, 0f];
+            float[] percLossArray = protMods.PerTierRelativeProtectionLoss ?? [0f, 0f];
 
             for (int tier = 1; tier <= weaponTier; tier++)
             {
                 bool isHigherTier = tier > protMods.ProtectionTier;
-                float flatLoss = isHigherTier ? protMods.PerTierFlatDamageReductionLoss[1] : protMods.PerTierFlatDamageReductionLoss[0];
-                float percLoss = isHigherTier ? protMods.PerTierRelativeProtectionLoss[1] : protMods.PerTierRelativeProtectionLoss[0];
+                
+                int flatIdx = Math.Clamp(isHigherTier ? 1 : 0, 0, flatLossArray.Length - 1);
+                int percIdx = Math.Clamp(isHigherTier ? 1 : 0, 0, percLossArray.Length - 1);
+
+                float flatLoss = flatLossArray[flatIdx];
+                float percLoss = percLossArray[percIdx];
 
                 if (isHigherTier && protMods.HighDamageTierResistant)
                 {
@@ -183,14 +215,11 @@ namespace CaveInArmorMod
                     percLoss /= 2f;
                 }
 
-                flatDmgProt -= flatLoss;
-                percentProt *= (1f - percLoss);
+                flatDmgProt -= flatLoss * slotMultiplier;
+                percentProt *= 1f - (percLoss * slotMultiplier);
             }
 
-            flatDmgProt *= CaveInArmorModSystem.Config.ArmorEffectivenessMultiplier;
-            percentProt *= CaveInArmorModSystem.Config.ArmorEffectivenessMultiplier;
-
-            float durabilityLoss = 0.5f + initialDamage * Math.Max(0.5f, (float)((weaponTier - protMods.ProtectionTier) * 3));
+            float durabilityLoss = 0.5f + initialDamage * Math.Max(0.5f, (weaponTier - protMods.ProtectionTier) * 3);
             durabilityLoss *= CaveInArmorModSystem.Config.DurabilityDamageMultiplier;
 
             int durabilityLossInt = GameMath.RoundRandom(CaveInArmorModSystem.ServerApi.World.Rand, durabilityLoss);
@@ -204,9 +233,12 @@ namespace CaveInArmorMod
                 }
             }
 
-            currentDamage = Math.Max(0f, currentDamage - flatDmgProt);
-            currentDamage *= (1f - Math.Max(0f, percentProt));
-
+            float previousDamage = currentDamage;currentDamage = Math.Max(0f, currentDamage - Math.Max(0f, flatDmgProt));
+            currentDamage *= 1f - Math.Clamp(percentProt, 0f, 1f);
+            if (CaveInArmorModSystem.Config.EnableDebugLogging)
+            {
+                CaveInArmorModSystem.ModLogger.Notification($"[{CaveInArmorModSystem.ModName}] Slot [{slotDebugName}] reduction process: Incomming={previousDamage} -> Outgoing={currentDamage} | Armor Durability Lost: {durabilityLossInt}");
+            }
             armorSlot.MarkDirty();
             return currentDamage;
         }
