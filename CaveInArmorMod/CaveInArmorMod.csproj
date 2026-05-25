@@ -24,6 +24,10 @@
       <HintPath>$(AppData)\Vintagestory\Mods\VSEssentials.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(VINTAGE_STORY_PATH)\Lib\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>
