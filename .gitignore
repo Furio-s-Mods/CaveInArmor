@@ -1,0 +1,18 @@
+
+# dotenv files
+.env
+Directory.Build.props.user
+
+# Build output
+bin/
+obj/
+
+# User-specific files
+*.user
+*.suo
+
+# Game Libraries
+/Lib/
+
+# Stuff
+ideas/
