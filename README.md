@@ -35,8 +35,22 @@ Upon the first server boot, a configuration file will be generated inside your `
 * `DurabilityDamageMultiplier`: Scales durability loss (Set to `0.0` for unbreakable protection).
 * `MinimumDamageThreshold`: The minimum damage a player will always take, preventing complete immunity.
 
+
+### How To Use
+- [see mod page](https://mods.vintagestory.at/show/mod/52223)
 ---
 
 ## Contribution & Development
 
 Want to contribute code or compile this mod locally? Please review the central [Contributing Guidelines](https://github.com/Furio-s-Mods/.github/blob/main/CONTRIBUTING.md) for environment setup and path management instructions.
+
+## Acknowledgements
+* **[Anego Studios](https://anegostudios.com)** - Vintage Story Devs
+* **AlteOgre** for the original idea for the [Ilu Ambar Server](https://www.vintagestory.at/forums/topic/15864-1222euen-ilu-ambar-quenta-y%C3%A1ra-whitelisted-coop-build-pve-focussed-modded-light-rp-new-player-friendly-difficulty-progression-unique/)
+
+
+## License
+
+[MIT License](LICENSE)
+
+---
