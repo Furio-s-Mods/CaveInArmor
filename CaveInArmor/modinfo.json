@@ -4,8 +4,8 @@
   "name": "Rock Attac - Armor Protec",
   "authors": [ "Furio" ],
   "contributors": [ "AlteOgre" ],
-  "version": "1.0.2",
-  "description": "Enables vanilla armor to natively mitigate crushing damage from falling blocks.",
+  "version": "1.1.0",
+  "description": "Enables vanilla armor to natively mitigate crushing damage from falling blocks and landslides.",
   "side": "Server",
   "requiredOnClient": false,
   "dependencies": {

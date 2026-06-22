@@ -1,6 +1,6 @@
 # CaveInArmor
 
-A lightweight, purely server-side C# code mod for **Vintage Story** that allows vanilla armor to dynamically mitigate, absorb, and process crushing damage from cave-ins and falling blocks.
+A lightweight, purely server-side C# code mod for **Vintage Story** that allows vanilla armor to dynamically mitigate, absorb, and process crushing damage from cave-ins, landslides and falling blocks.
 
 ---
 
@@ -16,6 +16,7 @@ A lightweight, purely server-side C# code mod for **Vintage Story** that allows 
 ## Configuration (`caveinarmorConfig.json`)
 
 Upon the first server boot, a configuration file will be generated inside your `ModConfig` directory.
+Automatic file upgrade for new versions, obsolete files are kept with .bad extension.
 
 ### Protection Modes
 
@@ -24,12 +25,22 @@ Upon the first server boot, a configuration file will be generated inside your `
 
 2. **Layered Mode (`"UseLayered": true`)**
    A specialized "mining safety" experience. Boulders strike your entire body sequentially, filtering damage from top to bottom.
-   * `LayeredHeadMultiplier`: Helmet effectiveness (Default: `1.0` - 100%)
-   * `LayeredTorsoMultiplier`: Chestplate effectiveness (Default: `0.5` - 50%)
-   * `LayeredLegsMultiplier`: Greaves effectiveness (Default: `0.1` - 10%)
+   3 possible situations:
+    - VERTICAL fall: `Vertical`: {
+      * `LayeredHeadMultiplier`: Helmet effectiveness (Default: `1.0` - 100%)
+      * `LayeredTorsoMultiplier`: Chestplate effectiveness (Default: `0.5` - 50%)
+      * `LayeredLegsMultiplier`: Greaves effectiveness (Default: `0.1` - 10%)
+    }
+    - VERTICAL bounce: `Horizontal`: {
+      * `LayeredHeadMultiplier`: Helmet effectiveness (Default: `0.0` - 0%)
+      * `LayeredTorsoMultiplier`: Chestplate effectiveness (Default: `0.5` - 50%)
+      * `LayeredLegsMultiplier`: Greaves effectiveness (Default: `1.0` - 100%)
+    }
+    - UNDER_FEET slide: uses `Vertical`.`LayeredLegsMultiplier`.
 
 ### Global Parameters
 
+* `ConfigVersion`: File verion number for integrity check.
 * `Enabled`: Instantly toggle the mod on or off.
 * `EnableDebugLogging`: Outputs real-time mitigation data directly to the server console.
 * `DurabilityDamageMultiplier`: Scales durability loss (Set to `0.0` for unbreakable protection).
