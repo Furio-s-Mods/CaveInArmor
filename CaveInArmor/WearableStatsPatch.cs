@@ -28,7 +28,8 @@ public static class WearableStatsPatch
 
         float initialDamage = damage;
 
-        // logger.Notification($"Processing cave-in hit for {player.PlayerName}. Initial Damage: {initialDamage}. System Mode: {(config.UseLayered ? "Layered" : "Lottery")}, MinimumDamageThreshold={config.MinimumDamageThreshold}");
+        if (logger.IsDebugEnabled) logger.Notification($"Processing cave-in hit for {player.PlayerName}. Initial Damage: {initialDamage}. System Mode: {(config.UseLayered ? "Layered" : "Lottery")}, MinimumDamageThreshold={config.MinimumDamageThreshold}");
+
 
         if (config.UseLayered && dmgSource.SourcePos != null)
         {
@@ -43,10 +44,8 @@ public static class WearableStatsPatch
             // CHECK A: Under-Feet Collapse (Soil Instability while climbing)
             if (blockBlockY < playerBlockY || deltaY < 0.0)
             {
-                damage = CalcReductionHelper.CalculateSlotReduction(player, inv[(int)EnumCharacterDressType.ArmorLegs], damage, dmgSource, initialDamage, config.Horizontal.LayeredLegsMultiplier, "ArmorLegs");
-                damage = Math.Max(config.MinimumDamageThreshold, damage);
-                
-                logger.Notification($"Layered (UNDER_FEET) final modified damage for {player.PlayerName}: {damage}");
+                damage = MitigateSlot(player, inv[(int)EnumCharacterDressType.ArmorLegs], damage, dmgSource, initialDamage, config.Horizontal.LayeredLegsMultiplier, "ArmorLegs", config.MinimumDamageThreshold);  
+                if (logger.IsDebugEnabled) logger.Notification($"Layered (UNDER_FEET) final modified damage for {player.PlayerName}: {damage}");
                 __result = damage; 
                 return false; 
             }
@@ -61,35 +60,27 @@ public static class WearableStatsPatch
                 if (motionY < -0.14)
                 {
                     isVerticalDrop = true;
-                    // logger.Notification($"Trajectory Verified: Pure Vertical Fall (Motion= Y: {motionY:F3})");
+                    if (logger.IsDebugEnabled) logger.Notification($"Trajectory Verified: Pure Vertical Fall (Motion= Y: {motionY:F3})");
                 } else
                 {
                     isVerticalDrop = false;
-                    // logger.Notification($"Trajectory Verified: horizontal Fall (Motion= Y: {motionY:F3})");
+                    if (logger.IsDebugEnabled) logger.Notification($"Trajectory Verified: horizontal Fall (Motion= Y: {motionY:F3})");
                 }
             }
 
             // CHECK B: VERTICAL DROP (Directly overhead onto head/helmet)
             if (isVerticalDrop)
             {
-                damage = CalcReductionHelper.CalculateSlotReduction(player, inv[(int)EnumCharacterDressType.ArmorHead], damage, dmgSource, initialDamage, config.Vertical.LayeredHeadMultiplier, "ArmorHead");
-                damage = CalcReductionHelper.CalculateSlotReduction(player, inv[(int)EnumCharacterDressType.ArmorBody], damage, dmgSource, initialDamage, config.Vertical.LayeredTorsoMultiplier, "ArmorBody");
-                damage = CalcReductionHelper.CalculateSlotReduction(player, inv[(int)EnumCharacterDressType.ArmorLegs], damage, dmgSource, initialDamage, config.Vertical.LayeredLegsMultiplier, "ArmorLegs");   
-                damage = Math.Max(config.MinimumDamageThreshold, damage);
-                
-                logger.Notification($"Layered (VERTICAL) final modified damage for {player.PlayerName}: {damage}");
+                damage = MitigateFullSet(player, inv, damage, dmgSource, initialDamage, config.Vertical, config.MinimumDamageThreshold);
+                if (logger.IsDebugEnabled) logger.Notification($"Layered (VERTICAL) final modified damage for {player.PlayerName}: {damage}");
                 __result = damage; 
                 return false;
             }
             // CHECK C: HORIZONTAL IMPACT (Landslide, ledge roll, or side swipe)
             else
             {
-                damage = CalcReductionHelper.CalculateSlotReduction(player, inv[(int)EnumCharacterDressType.ArmorHead], damage, dmgSource, initialDamage, config.Horizontal.LayeredHeadMultiplier, "ArmorHead");
-                damage = CalcReductionHelper.CalculateSlotReduction(player, inv[(int)EnumCharacterDressType.ArmorBody], damage, dmgSource, initialDamage, config.Horizontal.LayeredTorsoMultiplier, "ArmorBody");
-                damage = CalcReductionHelper.CalculateSlotReduction(player, inv[(int)EnumCharacterDressType.ArmorLegs], damage, dmgSource, initialDamage, config.Horizontal.LayeredLegsMultiplier, "ArmorLegs");
-                damage = Math.Max(config.MinimumDamageThreshold, damage);
-                
-                logger.Notification($"Layered (HORIZONTAL) final modified damage for {player.PlayerName}: {damage}");
+                damage = MitigateFullSet(player, inv, damage, dmgSource, initialDamage, config.Horizontal, config.MinimumDamageThreshold);
+                if (logger.IsDebugEnabled) logger.Notification($"Layered (HORIZONTAL) final modified damage for {player.PlayerName}: {damage}");
                 __result = damage; 
                 return false;
             }
@@ -97,32 +88,51 @@ public static class WearableStatsPatch
         // lottery mode
         else
         {
-            double rnd = sapi.World.Rand.NextDouble();
-            ItemSlot targetSlot;
-            string slotName;
-
-            if ((rnd -= 0.2) < 0.0)
-            {
-                targetSlot = inv[(int)EnumCharacterDressType.ArmorHead];
-                slotName = "ArmorHead";
-            }
-            else if (rnd - 0.5 < 0.0)
-            {
-                targetSlot = inv[(int)EnumCharacterDressType.ArmorBody];
-                slotName = "ArmorBody";
-            }
-            else
-            {
-                targetSlot = inv[(int)EnumCharacterDressType.ArmorLegs];
-                slotName = "ArmorLegs";
-            }
-
-            damage = CalcReductionHelper.CalculateSlotReduction(player, targetSlot, damage, dmgSource, initialDamage, 1.0f, slotName);
-            damage = Math.Max(config.MinimumDamageThreshold, damage);
-            
-            logger.Notification($"Lottery final modified damage for {player.PlayerName} (Targeted Slot: {slotName}): {damage}");
+            damage = MitigateLottery(player, inv, damage, dmgSource, initialDamage, config.MinimumDamageThreshold, sapi.World.Rand.NextDouble(), out string slotName);
+            if (logger.IsDebugEnabled) logger.Notification($"Lottery final modified damage for {player.PlayerName} (Targeted Slot: {slotName}): {damage}");
             __result = damage; 
-            return false; 
+            return false;
         }
+    }
+
+    // =========================================================================
+    // PRIVATE UTILITY HELPERS
+    // =========================================================================
+
+    private static float MitigateSlot(IPlayer player, ItemSlot slot, float damage, DamageSource source, float initialDmg, float multiplier, string debugName, float minThreshold)
+    {
+        damage = CalcReductionHelper.CalculateSlotReduction(player, slot, damage, source, initialDmg, multiplier, debugName);
+        return Math.Max(minThreshold, damage);
+    }
+
+    private static float MitigateFullSet(IPlayer player, IInventory inv, float damage, DamageSource source, float initialDmg, LayeredPieceMultiplier profile, float minThreshold)
+    {
+        damage = CalcReductionHelper.CalculateSlotReduction(player, inv[(int)EnumCharacterDressType.ArmorHead], damage, source, initialDmg, profile.LayeredHeadMultiplier, "ArmorHead");
+        damage = CalcReductionHelper.CalculateSlotReduction(player, inv[(int)EnumCharacterDressType.ArmorBody], damage, source, initialDmg, profile.LayeredTorsoMultiplier, "ArmorBody");
+        damage = CalcReductionHelper.CalculateSlotReduction(player, inv[(int)EnumCharacterDressType.ArmorLegs], damage, source, initialDmg, profile.LayeredLegsMultiplier, "ArmorLegs");
+        return Math.Max(minThreshold, damage);
+    }
+
+    private static float MitigateLottery(IPlayer player, IInventory inv, float damage, DamageSource source, float initialDmg, float minThreshold, double roll, out string selectedSlotName)
+    {
+        ItemSlot targetSlot;
+
+        if (roll < 0.2) // 20% Chance
+        {
+            targetSlot = inv[(int)EnumCharacterDressType.ArmorHead];
+            selectedSlotName = "ArmorHead";
+        }
+        else if (roll < 0.7) // 50% Chance
+        {
+            targetSlot = inv[(int)EnumCharacterDressType.ArmorBody];
+            selectedSlotName = "ArmorBody";
+        }
+        else // 30% Chance
+        {
+            targetSlot = inv[(int)EnumCharacterDressType.ArmorLegs];
+            selectedSlotName = "ArmorLegs";
+        }
+
+        return MitigateSlot(player, targetSlot, damage, source, initialDmg, 1.0f, selectedSlotName, minThreshold);
     }
 }

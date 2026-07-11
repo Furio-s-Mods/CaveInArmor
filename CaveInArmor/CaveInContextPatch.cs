@@ -11,8 +11,9 @@ public static class CaveInContextPatch
     // Thread Safety: Separate instance tracking per thread
     [ThreadStatic]
     private static EntityBlockFalling _activeFallingBlock;
+    private const string TargetMethodName = "OnGameTick";
 
-    [HarmonyPatch(typeof(EntityBlockFalling), "OnGameTick")]
+    [HarmonyPatch(typeof(EntityBlockFalling), TargetMethodName)]
     [HarmonyPrefix]
     public static void OnGameTick_Prefix(EntityBlockFalling __instance)
     {
@@ -21,7 +22,7 @@ public static class CaveInContextPatch
 
     // Exception Safety: A Finalizer ALWAYS runs, even if OnGameTick throws an error.
     // This prevents stale state leakage if a cave-in crashes the game logic.
-    [HarmonyPatch(typeof(EntityBlockFalling), "OnGameTick")]
+    [HarmonyPatch(typeof(EntityBlockFalling), TargetMethodName)]
     [HarmonyFinalizer]
     public static void OnGameTick_Finalizer()
     {
@@ -32,7 +33,6 @@ public static class CaveInContextPatch
     [HarmonyPrefix]
     public static void ReceiveDamage_Prefix(DamageSource damageSource)
     {
-        // Synchronous Catch: WalkEntities runs immediately, so this flag is guaranteed active.
         if (_activeFallingBlock != null && damageSource != null)
         {
             if (damageSource.Source == EnumDamageSource.Block && damageSource.Type == EnumDamageType.Crushing)

@@ -5,6 +5,7 @@ namespace CaveInArmor;
 
 class CalcReductionHelper
 {
+    private static readonly float[] DefaultLossArray = [0f, 0f];
     public static float CalculateSlotReduction(IPlayer player, ItemSlot armorSlot, float currentDamage, DamageSource dmgSource, float initialDamage, float slotMultiplier, string slotDebugName)
     {
         if (currentDamage <= 0f || armorSlot == null || slotMultiplier <= 0f) return currentDamage;
@@ -17,7 +18,10 @@ class CalcReductionHelper
         
         if (armorSlot.Empty)
         {
-            logger.Notification($"Slot [{slotDebugName}] is empty. Skipping mitigation.");
+            if (logger.IsDebugEnabled)
+            {
+                logger.Notification($"Slot [{slotDebugName}] is empty. Skipping mitigation.");
+            }
             return currentDamage;
         }
         
@@ -34,8 +38,8 @@ class CalcReductionHelper
         float flatDmgProt = protMods.FlatDamageReduction * slotMultiplier;
         float percentProt = protMods.RelativeProtection * slotMultiplier;
 
-        float[] flatLossArray = protMods.PerTierFlatDamageReductionLoss ?? [0f, 0f];
-        float[] percLossArray = protMods.PerTierRelativeProtectionLoss ?? [0f, 0f];
+        float[] flatLossArray = protMods.PerTierFlatDamageReductionLoss ?? DefaultLossArray;
+        float[] percLossArray = protMods.PerTierRelativeProtectionLoss ?? DefaultLossArray;
 
         for (int tier = 1; tier <= weaponTier; tier++)
         {
@@ -69,13 +73,17 @@ class CalcReductionHelper
             {
                 sapi.World.PlaySoundAt(new AssetLocation("sounds/effect/toolbreak"), player.Entity, null, true, 32f, 1f);
             }
+            armorSlot.MarkDirty();
         }
 
-        float previousDamage = currentDamage;currentDamage = Math.Max(0f, currentDamage - Math.Max(0f, flatDmgProt));
+        float previousDamage = currentDamage;
+        currentDamage = Math.Max(0f, currentDamage - Math.Max(0f, flatDmgProt));
         currentDamage *= 1f - Math.Clamp(percentProt, 0f, 1f);
-        armorSlot.MarkDirty();
         
-        logger.Notification($"Slot [{slotDebugName}] reduction process: Incomming={previousDamage} -> Outgoing={currentDamage} | Armor Durability Lost: {durabilityLossInt}");
+        if (logger.IsDebugEnabled)
+        {
+            logger.Notification($"Slot [{slotDebugName}] reduction process: Incomming={previousDamage} -> Outgoing={currentDamage} | Armor Durability Lost: {durabilityLossInt}");
+        }
         return currentDamage;
     }
 }

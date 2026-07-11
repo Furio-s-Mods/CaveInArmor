@@ -13,15 +13,13 @@ public class CustomLogger(ILogger gameLogger, string modName, bool writeLog = tr
     private readonly ILogger gameLogger = gameLogger;
     private readonly string modName = modName;
     private readonly bool writeLog = writeLog;
+    public bool IsDebugEnabled => writeLog;
 
     public void WriteLog(EnumLogType logType, string message)
     {
         if (gameLogger == null) return;
         
-        if (writeLog)
-        {
-            gameLogger.Log(logType, $"[{modName}] {message}");
-        }
+        gameLogger.Log(logType, $"[{modName}] {message}");
     }
 
     public void Notification(string message) => WriteLog(EnumLogType.Notification, message);
