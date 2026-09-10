@@ -1,6 +1,10 @@
 # Changelog
 
 ## 1.0.2
+### NEW:
+- Automated builds from open source repo with verifiable official SHA256 checksum.
+
+## 1.0.2
 ### Changed
 - Renamed main class, split the code and tested for v1.22.3
 

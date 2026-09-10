@@ -17,7 +17,7 @@ public class CaveInArmorSystem : ModSystem
     public ICoreServerAPI ServerApi { get; private set; }
     public CustomLogger CustomLogger { get; private set; }
     public static CaveInArmorSystem Instance { get; private set; }
-    private bool disposed;
+    private int disposed = 0;
 
     public override bool ShouldLoad(EnumAppSide side) => side == EnumAppSide.Server;
 
@@ -46,8 +46,7 @@ public class CaveInArmorSystem : ModSystem
 
     public override void Dispose()
     {
-        if (disposed) return;
-        disposed = true;
+        if (System.Threading.Interlocked.Exchange(ref disposed, 1) == 1) return;
 
         harmony?.UnpatchAll(HarmonyId);
         harmony = null;
